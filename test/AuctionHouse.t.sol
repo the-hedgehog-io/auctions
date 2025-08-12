@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.8;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.30;
 
 import "forge-std/Test.sol";
 import "../src/AuctionHouse.sol";
@@ -10,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // Mock WETH contract
 contract MockWETH is ERC20 {
-    constructor() public ERC20("Wrapped Ether", "WETH") {}
+    constructor() ERC20("Wrapped Ether", "WETH") {}
     
     function deposit() external payable {
         _mint(msg.sender, msg.value);
@@ -18,13 +17,13 @@ contract MockWETH is ERC20 {
     
     function withdraw(uint256 amount) external {
         _burn(msg.sender, amount);
-        msg.sender.transfer(amount);
+        payable(msg.sender).transfer(amount);
     }
 }
 
 // Mock ERC721 contract for testing
 contract MockERC721 is ERC721 {
-    constructor() public ERC721("Mock NFT", "MNFT") {}
+    constructor() ERC721("Mock NFT", "MNFT") {}
     
     function mint(address to, uint256 tokenId) external {
         _mint(to, tokenId);
@@ -35,7 +34,7 @@ contract MockERC721 is ERC721 {
 contract MockZoraMedia {
     address public marketContract;
     
-    constructor(address _marketContract) public {
+    constructor(address _marketContract) {
         marketContract = _marketContract;
     }
     

@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.6.8;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.30;
 
-import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 import { IERC721, IERC165 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IMarket, Decimal } from "@zoralabs/core/interfaces/IMarket.sol";
 import { IMedia } from "@zoralabs/core/interfaces/IMedia.sol";
 import { IAuctionHouse } from "./interfaces/IAuctionHouse.sol";
@@ -28,9 +25,7 @@ interface IMediaExtended is IMedia {
  * @title An open auction house, enabling collectors and curators to run their own auctions
  */
 contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
-    using Counters for Counters.Counter;
 
     // The minimum amount of time left in an auction after a new bid is created
     uint256 public timeBuffer;
@@ -49,7 +44,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
 
     bytes4 constant interfaceId = 0x80ac58cd; // 721 interface id
 
-    Counters.Counter private _auctionIdTracker;
+    uint256 private _auctionIdTracker;
 
     /**
      * @notice Require that the specified auction exists
@@ -62,7 +57,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
     /*
      * Constructor
      */
-    constructor(address _zora, address _weth) public {
+    constructor(address _zora, address _weth) {
         require(
             IERC165(_zora).supportsInterface(interfaceId),
             "Doesn't support NFT interface"
@@ -94,7 +89,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         require(curatorFeePercentage < 100, "curatorFeePercentage must be less than 100");
         address tokenOwner = IERC721(tokenContract).ownerOf(tokenId);
         require(msg.sender == IERC721(tokenContract).getApproved(tokenId) || msg.sender == tokenOwner, "Caller must be approved or owner for token id");
-        uint256 auctionId = _auctionIdTracker.current();
+        uint256 auctionId = _auctionIdTracker;
 
         auctions[auctionId] = Auction({
             tokenId: tokenId,
@@ -106,14 +101,14 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
             reservePrice: reservePrice,
             curatorFeePercentage: curatorFeePercentage,
             tokenOwner: tokenOwner,
-            bidder: address(0),
+            bidder: payable(address(0)),
             curator: curator,
             auctionCurrency: auctionCurrency
         });
 
         IERC721(tokenContract).transferFrom(tokenOwner, address(this), tokenId);
 
-        _auctionIdTracker.increment();
+        _auctionIdTracker++;
 
         emit AuctionCreated(auctionId, tokenId, tokenContract, duration, reservePrice, tokenOwner, curator, curatorFeePercentage, auctionCurrency);
 
@@ -162,7 +157,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         require(
             auctions[auctionId].firstBidTime == 0 ||
             block.timestamp <
-            auctions[auctionId].firstBidTime.add(auctions[auctionId].duration),
+            auctions[auctionId].firstBidTime + auctions[auctionId].duration,
             "Auction expired"
         );
         require(
@@ -170,8 +165,8 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
                 "Must send at least reservePrice"
         );
         require(
-            amount >= auctions[auctionId].amount.add(
-                auctions[auctionId].amount.mul(minBidIncrementPercentage).div(100)
+            amount >= auctions[auctionId].amount + (
+                auctions[auctionId].amount * minBidIncrementPercentage / 100
             ),
             "Must send more than last bid by minBidIncrementPercentage amount"
         );
@@ -198,7 +193,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         _handleIncomingBid(amount, auctions[auctionId].auctionCurrency);
 
         auctions[auctionId].amount = amount;
-        auctions[auctionId].bidder = msg.sender;
+        auctions[auctionId].bidder = payable(msg.sender);
 
 
         bool extended = false;
@@ -206,9 +201,8 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         // we want to know by how much the timestamp is less than start + duration
         // if the difference is less than the timeBuffer, increase the duration by the timeBuffer
         if (
-            auctions[auctionId].firstBidTime.add(auctions[auctionId].duration).sub(
-                block.timestamp
-            ) < timeBuffer
+            (auctions[auctionId].firstBidTime + auctions[auctionId].duration) - 
+            block.timestamp < timeBuffer
         ) {
             // Playing code golf for gas optimization:
             // uint256 expectedEnd = auctions[auctionId].firstBidTime.add(auctions[auctionId].duration);
@@ -217,7 +211,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
             // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
             uint256 oldDuration = auctions[auctionId].duration;
             auctions[auctionId].duration =
-                oldDuration.add(timeBuffer.sub(auctions[auctionId].firstBidTime.add(oldDuration).sub(block.timestamp)));
+                oldDuration + (timeBuffer - ((auctions[auctionId].firstBidTime + oldDuration) - block.timestamp));
             extended = true;
         }
 
@@ -253,7 +247,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         );
         require(
             block.timestamp >=
-            auctions[auctionId].firstBidTime.add(auctions[auctionId].duration),
+            auctions[auctionId].firstBidTime + auctions[auctionId].duration,
             "Auction hasn't completed"
         );
 
@@ -282,8 +276,8 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
 
 
         if(auctions[auctionId].curator != address(0)) {
-            curatorFee = tokenOwnerProfit.mul(auctions[auctionId].curatorFeePercentage).div(100);
-            tokenOwnerProfit = tokenOwnerProfit.sub(curatorFee);
+            curatorFee = tokenOwnerProfit * auctions[auctionId].curatorFeePercentage / 100;
+            tokenOwnerProfit = tokenOwnerProfit - curatorFee;
             _handleOutgoingBid(auctions[auctionId].curator, curatorFee, auctions[auctionId].auctionCurrency);
         }
         _handleOutgoingBid(auctions[auctionId].tokenOwner, tokenOwnerProfit, auctions[auctionId].auctionCurrency);
@@ -335,7 +329,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
             uint256 beforeBalance = token.balanceOf(address(this));
             token.safeTransferFrom(msg.sender, address(this), amount);
             uint256 afterBalance = token.balanceOf(address(this));
-            require(beforeBalance.add(amount) == afterBalance, "Token transfer call did not transfer expected amount");
+            require(beforeBalance + amount == afterBalance, "Token transfer call did not transfer expected amount");
         }
     }
 
@@ -399,7 +393,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
 
         // We have to calculate the amount to send to the token owner here in case there was a
         // sell-on share on the token
-        return (true, afterBalance.sub(beforeBalance));
+        return (true, afterBalance - beforeBalance);
     }
 
     // TODO: consider reverting if the message sender is not WETH
