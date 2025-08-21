@@ -33,11 +33,17 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
     // The minimum percentage difference between the last bid amount and the current bid.
     uint8 public minBidIncrementPercentage;
 
+    // The percentage of the new bid amount that goes to the previous bidder as a rebate
+    uint8 public rebatePercentage;
+
     // The address of the zora protocol to use via this contract
     address public zora;
 
     // / The address of the WETH contract, so that any ETH transferred can be handled as an ERC-20
     address public wethAddress;
+
+    // The owner of the contract who can set rebate percentage
+    address public owner;
 
     // A mapping of all of the auctions currently running.
     mapping(uint256 => IAuctionHouse.Auction) public auctions;
@@ -54,6 +60,14 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         _;
     }
 
+    /**
+     * @notice Require that the caller is the contract owner
+     */
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
     /*
      * Constructor
      */
@@ -64,8 +78,10 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         );
         zora = _zora;
         wethAddress = _weth;
+        owner = msg.sender;
         timeBuffer = 15 * 60; // extend 15 minutes after every bid made in last 15 minutes
         minBidIncrementPercentage = 5; // 5%
+        rebatePercentage = 10; // 10% default rebate
     }
 
     /**
@@ -118,6 +134,16 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         }
 
         return auctionId;
+    }
+
+    /**
+     * @notice Set the rebate percentage for outbid users
+     * @dev Only callable by the contract owner
+     * @param newRebatePercentage The new rebate percentage (0-100)
+     */
+    function setRebatePercentage(uint8 newRebatePercentage) external override onlyOwner {
+        require(newRebatePercentage <= 100, "Rebate percentage cannot exceed 100");
+        rebatePercentage = newRebatePercentage;
     }
 
     /**
@@ -183,14 +209,18 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         }
 
         // If this is the first valid bid, we should set the starting time now.
-        // If it's not, then we should refund the last bidder
+        // If it's not, then we should refund the last bidder with rebate
         if(auctions[auctionId].firstBidTime == 0) {
             auctions[auctionId].firstBidTime = block.timestamp;
-        } else if(lastBidder != address(0)) {
-            _handleOutgoingBid(lastBidder, auctions[auctionId].amount, auctions[auctionId].auctionCurrency);
         }
 
+        // Handle incoming bid first to ensure we have the funds
         _handleIncomingBid(amount, auctions[auctionId].auctionCurrency);
+
+        // Now handle rebate if there was a previous bidder
+        if(auctions[auctionId].firstBidTime != 0 && lastBidder != address(0)) {
+            _handleBidRebate(auctionId, lastBidder, auctions[auctionId].amount, amount, auctions[auctionId].auctionCurrency);
+        }
 
         auctions[auctionId].amount = amount;
         auctions[auctionId].bidder = payable(msg.sender);
@@ -394,6 +424,46 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         // We have to calculate the amount to send to the token owner here in case there was a
         // sell-on share on the token
         return (true, afterBalance - beforeBalance);
+    }
+
+    /**
+     * @dev Handle rebate distribution when a user is outbid
+     * @param auctionId The ID of the auction
+     * @param previousBidder The address of the previous bidder
+     * @param previousBidAmount The amount of the previous bid
+     * @param newBidAmount The amount of the new bid
+     * @param currency The currency of the auction
+     */
+    function _handleBidRebate(
+        uint256 auctionId,
+        address payable previousBidder,
+        uint256 previousBidAmount,
+        uint256 newBidAmount,
+        address currency
+    ) internal {
+        // Calculate rebate amount (percentage of previous bid, but ensure we don't exceed available funds)
+        uint256 maxRebateAmount = newBidAmount - previousBidAmount; // Maximum rebate is the difference
+        uint256 rebateAmount = (previousBidAmount * rebatePercentage) / 100;
+        
+        // Cap the rebate to ensure we don't exceed available funds
+        if (rebateAmount > maxRebateAmount) {
+            rebateAmount = maxRebateAmount;
+        }
+        
+        // Total amount to send to previous bidder: their original bid + rebate
+        uint256 totalRefundAmount = previousBidAmount + rebateAmount;
+        
+        // Emit event for rebate distribution
+        emit BidRebateDistributed(
+            auctionId,
+            previousBidder,
+            rebateAmount,
+            totalRefundAmount,
+            currency
+        );
+        
+        // Send the refund with rebate to the previous bidder
+        _handleOutgoingBid(previousBidder, totalRefundAmount, currency);
     }
 
     // TODO: consider reverting if the message sender is not WETH

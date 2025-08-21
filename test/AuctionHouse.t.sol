@@ -109,6 +109,14 @@ contract AuctionHouseTest is Test {
         address auctionCurrency
     );
 
+    event BidRebateDistributed(
+        uint256 indexed auctionId,
+        address indexed previousBidder,
+        uint256 rebateAmount,
+        uint256 refundAmount,
+        address auctionCurrency
+    );
+
     function setUp() public {
         // Deploy mock contracts
         weth = new MockWETH();
@@ -227,13 +235,21 @@ contract AuctionHouseTest is Test {
         
         uint256 balanceBefore = bidder1.balance;
         
-        // Create second bid (should refund first bidder)
+        // Create second bid (should refund first bidder with rebate)
         vm.prank(bidder2);
         uint256 newBidAmount = RESERVE_PRICE + (RESERVE_PRICE * 5) / 100; // 5% increment
         auctionHouse.createBid{value: newBidAmount}(auctionId, newBidAmount);
         
         uint256 balanceAfter = bidder1.balance;
-        assertEq(balanceAfter, balanceBefore + RESERVE_PRICE, "first bidder should be refunded");
+        
+        // Calculate expected refund: original bid + rebate (capped by available funds)
+        // With 10% rebate on 0.5 ETH = 0.05 ETH, but max available is 0.025 ETH (difference between bids)
+        uint256 maxRebateAmount = newBidAmount - RESERVE_PRICE; // 0.025 ETH
+        uint256 rebateAmount = (RESERVE_PRICE * 10) / 100; // 0.05 ETH
+        uint256 actualRebate = rebateAmount > maxRebateAmount ? maxRebateAmount : rebateAmount; // 0.025 ETH
+        uint256 expectedRefund = RESERVE_PRICE + actualRebate; // 0.5 + 0.025 = 0.525 ETH
+        
+        assertEq(balanceAfter, balanceBefore + expectedRefund, "first bidder should be refunded with capped rebate");
     }
 
     function testEndAuction() public {
@@ -375,5 +391,62 @@ contract AuctionHouseTest is Test {
         // Try to end auction before expiry
         vm.expectRevert("Auction hasn't completed");
         auctionHouse.endAuction(auctionId);
+    }
+
+    function testRebatePercentage() public {
+        // Test that rebate percentage can be set by owner
+        uint8 newRebatePercentage = 15;
+        auctionHouse.setRebatePercentage(newRebatePercentage);
+        assertEq(auctionHouse.rebatePercentage(), newRebatePercentage, "Rebate percentage should be updated");
+        
+        // Test that non-owner cannot set rebate percentage
+        vm.prank(bidder1);
+        vm.expectRevert("Only owner can call this function");
+        auctionHouse.setRebatePercentage(20);
+        
+        // Test that rebate percentage cannot exceed 100
+        vm.expectRevert("Rebate percentage cannot exceed 100");
+        auctionHouse.setRebatePercentage(101);
+    }
+
+    function testBidRebateEvent() public {
+        // Create auction
+        nft.approve(address(auctionHouse), TOKEN_ID);
+        uint256 auctionId = auctionHouse.createAuction(
+            TOKEN_ID,
+            address(nft),
+            DURATION,
+            RESERVE_PRICE,
+            curator,
+            CURATOR_FEE_PERCENTAGE,
+            address(0)
+        );
+        
+        // Approve auction
+        vm.prank(curator);
+        auctionHouse.setAuctionApproval(auctionId, true);
+        
+        // Create first bid
+        vm.prank(bidder1);
+        auctionHouse.createBid{value: RESERVE_PRICE}(auctionId, RESERVE_PRICE);
+        
+        // Create second bid and expect rebate event
+        vm.prank(bidder2);
+        uint256 newBidAmount = RESERVE_PRICE + (RESERVE_PRICE * 5) / 100; // 5% increment
+        uint256 maxRebateAmount = newBidAmount - RESERVE_PRICE; // 0.025 ETH
+        uint256 rebateAmount = (RESERVE_PRICE * 10) / 100; // 0.05 ETH
+        uint256 actualRebate = rebateAmount > maxRebateAmount ? maxRebateAmount : rebateAmount; // 0.025 ETH
+        uint256 totalRefund = RESERVE_PRICE + actualRebate; // 0.5 + 0.025 = 0.525 ETH
+        
+        vm.expectEmit(true, true, true, true);
+        emit BidRebateDistributed(
+            auctionId,
+            bidder1,
+            actualRebate, // Use the capped rebate amount
+            totalRefund,
+            address(0)
+        );
+        
+        auctionHouse.createBid{value: newBidAmount}(auctionId, newBidAmount);
     }
 } 

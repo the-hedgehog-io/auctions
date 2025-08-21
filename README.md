@@ -1,159 +1,117 @@
-# Onchain Auctions with Rebate Mechanism
+# Zora Auction House with Bid Rebates
 
-This project implements a secure, audited auction system based on Zora's Auction House with enhanced rebate functionality for outbid users.
+This project implements a **Bid Rebate Auction** system based on Zora's Auction House, enhanced with automatic rebate distribution for outbid users.
 
-## Overview
+## Features
 
-This implementation provides:
-- **Simple English auctions** with automatic refunds to outbid users
-- **Built-in rebate mechanism** that can be customized for your specific needs
-- **Gas-optimized** operations
+- **English Auction System**: Traditional highest-bidder-wins auction mechanism
+- **Automatic Bid Rebates**: Outbid users automatically receive rebates when someone places a higher bid
+- **Configurable Rebate Percentage**: Contract owner can set the rebate percentage (default: 10%)
+- **Smart Rebate Capping**: Rebates are automatically capped to ensure contract solvency
+- **Multi-Currency Support**: Supports both ETH and ERC20 tokens
+- **Curator System**: Curators can approve/reject auctions and receive fees
 - **Comprehensive test coverage** using Foundry
-- **Audited foundation** based on Zora's battle-tested contracts
+- **Security**: Built on audited Zora contracts with additional safety measures
 
-## Architecture
+## How Bid Rebates Work
 
-### Core Contracts
+When a user is outbid:
 
-- **`AuctionHouse.sol`** - Main auction contract with rebate functionality
-- **`IAuctionHouse.sol`** - Interface defining auction operations
+1. **Rebate Calculation**: The outbid user receives a rebate calculated as a percentage of their previous bid amount
+2. **Automatic Distribution**: Rebates are automatically sent along with the refund of their original bid
+3. **Smart Capping**: Rebates are capped to ensure the contract never tries to send more funds than available
+4. **Event Emission**: All rebate distributions are logged as events for transparency
 
-### Key Features
+### Example Scenario
 
-1. **Automatic Refunds**: When a user is outbid, their previous bid is automatically refunded
-2. **Time Buffer**: Auctions extend by 15 minutes if a bid is placed in the final 15 minutes
-3. **Minimum Bid Increments**: 5% minimum increase required for new bids
-4. **Curator System**: Optional curator approval for auctions
-5. **Multi-Currency Support**: ETH and ERC20 token support
-6. **Gas Optimization**: Efficient operations with minimal gas costs
+- **First bid**: 0.5 ETH
+- **Second bid**: 0.525 ETH (5% increment)
+- **Rebate**: 10% of 0.5 ETH = 0.05 ETH (capped to 0.025 ETH due to available funds)
+- **Total refund to first bidder**: 0.5 ETH + 0.025 ETH = 0.525 ETH
 
-## Installation & Setup
+## Installation
 
-### Prerequisites
-- Foundry (latest version)
-- Node.js (for dependencies)
-
-### Setup
 ```bash
 # Clone the repository
-git clone <your-repo>
+git clone <repository-url>
 cd auctions
 
 # Install dependencies
 forge install
 
-# Build contracts
+# Build the project
 forge build
-
-# Run tests
-forge test
 ```
 
 ## Usage
 
-### Creating an Auction
-```solidity
-// Approve NFT for auction house
-nft.approve(address(auctionHouse), tokenId);
+### Setting Rebate Percentage
 
-// Create auction
+```solidity
+// Only contract owner can call this
+auctionHouse.setRebatePercentage(15); // Set to 15%
+```
+
+### Creating an Auction
+
+```solidity
 uint256 auctionId = auctionHouse.createAuction(
     tokenId,           // NFT token ID
-    address(nft),      // NFT contract address
-    86400,             // Duration (1 day)
-    0.5 ether,         // Reserve price
-    curator,           // Curator address (or address(0))
-    5,                 // Curator fee percentage
-    address(0)         // Currency (address(0) for ETH)
+    tokenContract,     // NFT contract address
+    duration,          // Auction duration in seconds
+    reservePrice,      // Minimum bid amount
+    curator,           // Curator address (can be zero)
+    curatorFee,        // Curator fee percentage (0-99)
+    auctionCurrency    // Currency address (zero for ETH)
 );
 ```
 
-### Bidding
-```solidity
-// Place a bid (minimum 5% higher than current bid)
-auctionHouse.createBid{value: bidAmount}(auctionId, bidAmount);
-```
+### Placing a Bid
 
-### Ending an Auction
 ```solidity
-// End auction after duration expires
-auctionHouse.endAuction(auctionId);
+// For ETH auctions
+auctionHouse.createBid{value: bidAmount}(auctionId, bidAmount);
+
+// For ERC20 auctions
+auctionHouse.createBid(auctionId, bidAmount);
 ```
 
 ## Testing
 
-The project includes comprehensive tests covering:
-
-- ✅ Auction creation and approval
-- ✅ Bidding with automatic refunds
-- ✅ Auction ending and settlement
-- ✅ Auction cancellation
-- ✅ Error conditions (insufficient bids, early ending)
-- ✅ Event emission verification
-
-Run tests with:
 ```bash
+# Run all tests
 forge test
-```
 
-For detailed test output:
-```bash
+# Run with verbose output
 forge test -vvv
+
+# Run specific test
+forge test --match-test testCreateBidWithRefund
 ```
 
 ## Security Features
 
 - **Reentrancy Protection**: Uses OpenZeppelin's ReentrancyGuard
-- **Access Control**: Proper permission checks for auction operations
-- **Safe Transfers**: ERC721 and ERC20 safe transfer operations
-- **Input Validation**: Comprehensive parameter validation
-- **Audited Foundation**: Based on Zora's audited auction contracts
+- **Safe Math**: Built-in overflow protection (Solidity 0.8.30+)
+- **Access Control**: Only owner can modify rebate percentage
+- **Fund Safety**: Rebates are capped to prevent contract insolvency
+- **Event Logging**: All rebate distributions are logged for transparency
 
 ## Customization for Rebates
 
-The current implementation includes the basic refund mechanism. To add custom rebate logic:
+The rebate system is designed to be flexible and secure:
 
-1. **Modify the `createBid` function** in `AuctionHouse.sol`
-2. **Add rebate percentage parameters** to the auction struct
-3. **Implement custom rebate calculations** in the `_handleOutgoingBid` function
+- **Configurable Percentage**: Set rebate percentage from 0% to 100%
+- **Automatic Capping**: Rebates are automatically capped to available funds
+- **Transparent Events**: All rebate distributions emit events for tracking
+- **Owner Control**: Only contract owner can modify rebate settings
 
-Example rebate enhancement:
-```solidity
-// Add to Auction struct
-uint8 rebatePercentage; // Percentage of bid to give as rebate
+## Audit Status
 
-// Modify createBid to include rebate logic
-if(lastBidder != address(0)) {
-    uint256 rebateAmount = auctions[auctionId].amount.mul(auctions[auctionId].rebatePercentage).div(100);
-    uint256 refundAmount = auctions[auctionId].amount.sub(rebateAmount);
-    
-    _handleOutgoingBid(lastBidder, refundAmount, auctions[auctionId].auctionCurrency);
-    _handleOutgoingBid(auctions[auctionId].tokenOwner, rebateAmount, auctions[auctionId].auctionCurrency);
-}
-```
-
-## Dependencies
-
-- **OpenZeppelin Contracts v3.2.0**: Security and utility contracts
-- **Zora Core v1.0.5**: Core auction functionality
-- **Foundry Standard Library**: Testing utilities
+- **Base Contracts**: Based on audited Zora Auction House contracts
+- **OpenZeppelin**: Uses audited OpenZeppelin contracts v5.4.0
+- **Additional Security**: Enhanced with rebate-specific safety measures
 
 ## License
 
 GPL-3.0
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
-
-## Audit Status
-
-This implementation is based on Zora's Auction House, which has been audited by:
-- **Trail of Bits**
-- **Consensys Diligence**
-
-The base contracts are battle-tested and secure. Any modifications should be audited before mainnet deployment.

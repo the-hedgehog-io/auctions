@@ -97,6 +97,14 @@ interface IAuctionHouse {
         address tokenOwner
     );
 
+    event BidRebateDistributed(
+        uint256 indexed auctionId,
+        address indexed previousBidder,
+        uint256 rebateAmount,
+        uint256 refundAmount,
+        address auctionCurrency
+    );
+
     function createAuction(
         uint256 tokenId,
         address tokenContract,
@@ -116,4 +124,8 @@ interface IAuctionHouse {
     function endAuction(uint256 auctionId) external;
 
     function cancelAuction(uint256 auctionId) external;
+
+    function setRebatePercentage(uint8 newRebatePercentage) external;
+
+    function rebatePercentage() external view returns (uint8);
 }
