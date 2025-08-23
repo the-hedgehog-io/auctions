@@ -1,4 +1,4 @@
-# Zora Auction House with Bid Rebates
+# Hedgehog Auction House with Bid Rebates
 
 This project implements a **Bid Rebate Auction** system based on Zora's Auction House, enhanced with automatic rebate distribution for outbid users.
 
@@ -49,13 +49,13 @@ forge build
 
 ```solidity
 // Only contract owner can call this
-auctionHouse.setRebatePercentage(15); // Set to 15%
+hedgehogAuction.setRebatePercentage(15); // Set to 15%
 ```
 
 ### Creating an Auction
 
 ```solidity
-uint256 auctionId = auctionHouse.createAuction(
+uint256 auctionId = hedgehogAuction.createAuction(
     tokenId,           // NFT token ID
     tokenContract,     // NFT contract address
     duration,          // Auction duration in seconds
@@ -70,10 +70,10 @@ uint256 auctionId = auctionHouse.createAuction(
 
 ```solidity
 // For ETH auctions
-auctionHouse.createBid{value: bidAmount}(auctionId, bidAmount);
+hedgehogAuction.createBid{value: bidAmount}(auctionId, bidAmount);
 
 // For ERC20 auctions
-auctionHouse.createBid(auctionId, bidAmount);
+hedgehogAuction.createBid(auctionId, bidAmount);
 ```
 
 ## Testing

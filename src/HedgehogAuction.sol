@@ -4,11 +4,11 @@ pragma solidity 0.8.30;
 
 import { IERC721, IERC165 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IMarket, Decimal } from "@zoralabs/core/interfaces/IMarket.sol";
 import { IMedia } from "@zoralabs/core/interfaces/IMedia.sol";
-import { IAuctionHouse } from "./interfaces/IAuctionHouse.sol";
+import { IHedgehogAuction } from "./interfaces/IHedgehogAuction.sol";
 
 interface IWETH {
     function deposit() external payable;
@@ -24,7 +24,7 @@ interface IMediaExtended is IMedia {
 /**
  * @title An open auction house, enabling collectors and curators to run their own auctions
  */
-contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
+contract HedgehogAuction is IHedgehogAuction, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // The minimum amount of time left in an auction after a new bid is created
@@ -46,7 +46,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
     address public owner;
 
     // A mapping of all of the auctions currently running.
-    mapping(uint256 => IAuctionHouse.Auction) public auctions;
+    mapping(uint256 => IHedgehogAuction.Auction) public auctions;
 
     bytes4 constant interfaceId = 0x80ac58cd; // 721 interface id
 
@@ -107,7 +107,7 @@ contract AuctionHouse is IAuctionHouse, ReentrancyGuard {
         require(msg.sender == IERC721(tokenContract).getApproved(tokenId) || msg.sender == tokenOwner, "Caller must be approved or owner for token id");
         uint256 auctionId = _auctionIdTracker;
 
-        auctions[auctionId] = Auction({
+        auctions[auctionId] = IHedgehogAuction.Auction({
             tokenId: tokenId,
             tokenContract: tokenContract,
             approved: false,

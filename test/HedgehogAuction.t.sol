@@ -2,8 +2,8 @@
 pragma solidity 0.8.30;
 
 import "forge-std/Test.sol";
-import "../src/AuctionHouse.sol";
-import "../src/interfaces/IAuctionHouse.sol";
+import "../src/HedgehogAuction.sol";
+import "../src/interfaces/IHedgehogAuction.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -50,7 +50,7 @@ contract MockMarket {
     }
 }
 
-contract AuctionHouseTest is Test {
+contract HedgehogAuctionTest is Test {
     function onERC721Received(
         address operator,
         address from,
@@ -59,7 +59,7 @@ contract AuctionHouseTest is Test {
     ) external pure returns (bytes4) {
         return this.onERC721Received.selector;
     }
-    AuctionHouse public auctionHouse;
+    HedgehogAuction public auctionHouse;
     MockWETH public weth;
     MockERC721 public nft;
     MockZoraMedia public zoraMedia;
@@ -125,7 +125,7 @@ contract AuctionHouseTest is Test {
         zoraMedia = new MockZoraMedia(address(market));
         
         // Deploy auction house
-        auctionHouse = new AuctionHouse(address(zoraMedia), address(weth));
+        auctionHouse = new HedgehogAuction(address(zoraMedia), address(weth));
         
         // Mint NFT to owner
         nft.mint(owner, TOKEN_ID);
@@ -136,7 +136,7 @@ contract AuctionHouseTest is Test {
         vm.deal(curator, 1 ether);
     }
 
-    function testConstructor() public {
+    function testConstructor() public view  {
         assertEq(auctionHouse.zora(), address(zoraMedia), "incorrect zora address");
         assertEq(auctionHouse.wethAddress(), address(weth), "incorrect weth address");
         assertEq(auctionHouse.timeBuffer(), 900, "time buffer should equal 900");

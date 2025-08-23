@@ -3,9 +3,9 @@
 pragma solidity 0.8.30;
 
 /**
- * @title Interface for Auction Houses
+ * @title Interface for Auctions
  */
-interface IAuctionHouse {
+interface IHedgehogAuction {
     struct Auction {
         // ID for the ERC721 token
         uint256 tokenId;

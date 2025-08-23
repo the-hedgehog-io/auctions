@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
+import "../src/HedgehogAuction.sol";
 
 contract AuctionScript is Script {
 
@@ -9,6 +10,9 @@ contract AuctionScript is Script {
 
     function run() public {
         vm.startBroadcast();
+
+        // Example: Deploy HedgehogAuction
+        // HedgehogAuction auctionHouse = new HedgehogAuction(address(0x...), address(0x...));
 
         vm.stopBroadcast();
     }
