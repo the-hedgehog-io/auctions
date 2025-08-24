@@ -31,7 +31,7 @@ interface IHedgehogAuction {
         // The curator can reject or approve an auction
         address payable curator;
         // The address of the ERC-20 currency to run the auction with.
-        // If set to 0x0, the auction will be run in ETH
+        // If set to 0x0, the auction will be run in native token
         address auctionCurrency;
     }
 

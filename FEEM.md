@@ -8,7 +8,7 @@ The FeeM Auction System consists of three main components:
 
 1. **FeeMAuction Contract** - The main contract that manages FeeM auctions
 2. **FeeM Oracle Interface** - Interface for interacting with Sonic blockchain's FeeM system
-3. **Self-Contained Auction Logic** - Built-in auction management without external dependencies
+3. **HedgehogAuction Integration** - Leverages the existing auction infrastructure
 
 ## How It Works
 
@@ -18,7 +18,7 @@ The FeeM Auction System consists of three main components:
 - Users must have FeeM delegation capability on Sonic blockchain
 
 ### 2. Auction Process
-- Bidders place bids in ETH
+- Bidders place bids in S
 - Highest bidder wins the auction
 - Project receives funding immediately (minus fees)
 
@@ -41,36 +41,12 @@ The FeeM Auction System consists of three main components:
 - **Fee Management**: Configurable platform and project fees
 - **Emergency Functions**: Withdrawal capabilities for contract owner
 
-## Sonic FeeM Integration
-
-The system is designed to integrate seamlessly with Sonic blockchain's FeeM delegation mechanism as described in the [official documentation](https://docs.soniclabs.com/funding/fee-monetization):
-
-### FeeM System Overview
-- **90% of network fees** go to FeeM (Fee Monetization) for builders
-- **10% of network fees** go to network validators
-- **Off-chain oracles** monitor transactions and track gas consumption
-- **Oracle quorum** required for reward confirmation
-- **Epoch-based** reward distribution system
-
-### Key Integration Points
-1. **Contract Registration**: Projects must register their contracts with the FeeM system
-2. **Gas Consumption Tracking**: Oracle system tracks gas usage per contract
-3. **Reward Calculation**: Rewards based on actual gas consumption during epochs
-4. **Delegation Management**: Users can delegate FeeM rewards to specific addresses
-5. **Quorum Verification**: Multiple oracle confirmations required for reward distribution
-
-## Contract Addresses
-
-- **FeeMAuction**: Main auction contract
-- **FeeM Oracle**: Interface to Sonic blockchain
-- **FeeM Token**: Sonic blockchain's FeeM token
-
 ## Usage Examples
 
 ### Creating an Auction
 
 ```solidity
-// Create a FeeM auction with minimum bid of 1 ETH
+// Create a FeeM auction with minimum bid of 1 S
 uint256 auctionId = feeMAuction.createFeeMAuction(
     1 ether,           // minBidAmount
     block.timestamp + 1   // startTime
@@ -80,7 +56,7 @@ uint256 auctionId = feeMAuction.createFeeMAuction(
 ### Starting an Auction
 
 ```solidity
-// Start the auction
+// Start the auction (creates Hedgehog auction)
 feeMAuction.startFeeMAuction(auctionId);
 ```
 
@@ -111,14 +87,6 @@ feeMAuction.delegateFeeM(auctionId);
 // Claim FeeM rewards (only auction winner)
 feeMAuction.claimFeeMRewards(auctionId);
 ```
-
-## Fee Structure
-
-| Component | Percentage | Description |
-|-----------|------------|-------------|
-| Platform Fee | 2% | Platform maintenance and development |
-| Project Fee | 5% | Project funding and operations |
-| Creator | 93% | Direct funding for the project |
 
 ## Security Considerations
 
@@ -182,26 +150,6 @@ The system integrates with Sonic blockchain's FeeM delegation mechanism:
 2. **Reward Estimation**: Calculates expected FeeM rewards for auction periods
 3. **Automatic Delegation**: Handles delegation to auction contract
 4. **Reward Collection**: Collects and distributes actual FeeM rewards
-
-### Oracle Requirements
-The FeeM oracle must provide:
-
-- Contract registration status
-- Gas consumption tracking
-- Reward estimates for specific time periods
-- Historical reward data
-- Delegation capability verification
-- Epoch information
-- Oracle quorum verification
-
-## Future Enhancements
-
-### Planned Features
-- **Multiple Reward Periods**: Allow auctioning of multiple consecutive months
-- **Dynamic FeeM**: Support for different FeeM token types
-- **Cross-chain Integration**: Support for multiple blockchains
-- **Advanced Analytics**: Detailed auction and reward analytics
-- **Governance**: DAO-based fee management and upgrades
 
 ## License
 

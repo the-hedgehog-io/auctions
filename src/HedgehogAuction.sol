@@ -364,7 +364,7 @@ contract HedgehogAuction is IHedgehogAuction, ReentrancyGuard {
     }
 
     function _handleOutgoingBid(address to, uint256 amount, address currency) internal {
-        // If the auction is in ETH, unwrap it from its underlying WETH and try to send it to the recipient.
+        // If the auction is in native token, unwrap it from its underlying WETH and try to send it to the recipient.
         if(currency == address(0)) {
             IWETH(wethAddress).withdraw(amount);
 
